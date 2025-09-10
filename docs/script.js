@@ -9,7 +9,7 @@ document.getElementById("uploadForm").addEventListener("submit", async (e) => {
   formData.append("file", fileInput.files[0]);
 
   try {
-    const res = await fetch("https://ai-layer-renamer-web.onrender.com/rename", {
+    const res = await fetch("https://YOUR-BACKEND-URL.onrender.com/rename", {
       method: "POST",
       body: formData,
     });

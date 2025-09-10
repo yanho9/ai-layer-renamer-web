@@ -3,7 +3,7 @@ services:
     name: ai-layer-renamer-web
     env: python
     rootDir: backend
-    buildCommand: "pip install -r requirements.txt"
+    buildCommand: "pip install -r backend/requirements.txt"
     startCommand: "gunicorn app:app"
     envVars:
       - key: OPENAI_API_KEY

@@ -7,7 +7,7 @@ A minimal web app that renames Photoshop PSD layers using AI.
 2. Connect this repo, set **root directory** = `backend`.
 3. Build command:
    ```
-   pip install -r requirements.txt
+   pip install -r backend/requirements.txt
    ```
 4. Start command:
    ```
@@ -22,13 +22,17 @@ A minimal web app that renames Photoshop PSD layers using AI.
    https://ai-layer-renamer.onrender.com
    ```
 
-Test backend:
+Test backend health:
 ```
 https://ai-layer-renamer.onrender.com/ping
 ```
-Should return `{"status":"ok"}`.
+
+Test PSD parsing (no AI):
+```
+POST https://ai-layer-renamer.onrender.com/debug
+```
 
 ## Frontend (GitHub Pages)
-1. Enable GitHub Pages in repo settings, source = `/frontend` folder.
-2. Edit `frontend/script.js` → replace backend URL with your Render URL.
+1. Enable GitHub Pages in repo settings, source = `/docs` folder.
+2. Edit `docs/script.js` → replace backend URL with your Render URL.
 3. Visit your GitHub Pages link → upload a PSD → get a renamed PSD 🎉
