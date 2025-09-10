@@ -28,10 +28,23 @@ def rename_layers():
     except Exception as e:
         return jsonify({"error": f"Failed to load PSD: {str(e)}"}), 500
 
-    # Try renaming layers
     for i, layer in enumerate(psd):
         if not layer.is_group() and layer.is_visible():
-            desc = f"Layer {i} | Size: {layer.size}, Visible: {layer.is_visible()}"
+            desc = None
+            try:
+                # Try metadata description
+                desc = f"Layer {i} | Size: {layer.size}, Kind: {getattr(layer, 'kind', 'unknown')}"
+            except Exception:
+                pass
+
+            if not desc:
+                try:
+                    # Fallback: rasterize to PIL image
+                    pil_img = layer.topil()
+                    desc = f"Layer {i} | Image fallback | Size: {pil_img.size}, Mode: {pil_img.mode}"
+                except Exception:
+                    desc = f"Layer {i} | Could not extract details"
+
             try:
                 response = openai.ChatCompletion.create(
                     model="gpt-4o-mini",
@@ -43,7 +56,7 @@ def rename_layers():
                 new_name = response["choices"][0]["message"]["content"].strip()
                 layer.name = new_name
             except Exception as e:
-                print("Error with AI rename:", e)
+                print("AI rename error:", e)
 
     out_bytes = io.BytesIO()
     psd.save(out_bytes)
@@ -63,7 +76,17 @@ def debug_layers():
 
     try:
         psd = PSDImage.open(psd_path)
-        info = [{"name": l.name, "kind": getattr(l, 'kind', 'unknown')} for l in psd]
+        info = []
+        for i, l in enumerate(psd):
+            try:
+                info.append({
+                    "index": i,
+                    "name": l.name,
+                    "kind": getattr(l, 'kind', 'unknown'),
+                    "size": getattr(l, 'size', None)
+                })
+            except Exception:
+                info.append({"index": i, "name": "Unknown", "kind": "error"})
         return jsonify(info)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
