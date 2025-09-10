@@ -1,13 +1,7 @@
 from flask import Flask, request, send_file, jsonify
 import openai, os, io, tempfile
-
-# Try to import psd-tools safely
-try:
-    from psd_tools import PSDImage
-    PSD_TOOLS_AVAILABLE = True
-except Exception as e:
-    PSD_TOOLS_AVAILABLE = False
-    print("⚠️ psd-tools not available:", e)
+from psd_tools.psd.image import PSDImage  # pillow-psd import
+from PIL import Image
 
 app = Flask(__name__)
 
@@ -32,31 +26,23 @@ def rename_layers():
         file.save(tmp.name)
         psd_path = tmp.name
 
-    if not PSD_TOOLS_AVAILABLE:
-        return jsonify({"error": "psd-tools library not available on server"}), 500
-
     try:
         psd = PSDImage.open(psd_path)
     except Exception as e:
-        return jsonify({"error": f"Failed to open PSD. Likely unsupported format. Details: {str(e)}"}), 500
+        return jsonify({"error": f"Failed to open PSD with pillow-psd: {str(e)}"}), 500
 
-    renamed_count = 0
-    for i, layer in enumerate(psd):
-        if not layer.is_group() and layer.is_visible():
-            # Try to describe the layer
-            desc = None
-            try:
-                desc = f"Layer {i} | Size: {layer.size}, Kind: {getattr(layer, 'kind', 'unknown')}"
-            except Exception:
-                pass
+    renamed_layers = []
+    new_images = []
 
-            if not desc:
-                try:
-                    pil_img = layer.topil()
-                    desc = f"Layer {i} | Fallback image | Size: {pil_img.size}, Mode: {pil_img.mode}"
-                except Exception:
-                    desc = f"Layer {i} | No details available"
+    for i, layer in enumerate(psd.layers):
+        try:
+            if not layer.is_visible():
+                continue
 
+            pil_img = layer.as_PIL()
+            desc = f"Layer {i} | Size: {pil_img.size}, Mode: {pil_img.mode}"
+
+            # Ask AI for a name
             try:
                 response = openai.ChatCompletion.create(
                     model="gpt-4o-mini",
@@ -66,20 +52,27 @@ def rename_layers():
                     ]
                 )
                 new_name = response["choices"][0]["message"]["content"].strip()
-                layer.name = new_name
-                renamed_count += 1
-            except Exception as e:
-                print("AI rename error:", e)
+            except Exception:
+                new_name = f"Layer_{i}"
 
-    if renamed_count == 0:
-        return jsonify({"error": "No layers could be processed. PSD may not be supported."}), 500
+            renamed_layers.append({"index": i, "name": new_name})
+            new_images.append(pil_img)
 
-    # Save updated PSD
+        except Exception as e:
+            renamed_layers.append({"index": i, "name": f"ErrorLayer_{i}", "error": str(e)})
+
+    if not new_images:
+        return jsonify({"error": "No layers processed"}), 500
+
+    # Rebuild new PSD-like file (flattened stack of images into one PSD)
     out_bytes = io.BytesIO()
     try:
-        psd.save(out_bytes)
+        base = Image.new("RGBA", psd.size, (255, 255, 255, 0))
+        for img in new_images:
+            base.alpha_composite(img.convert("RGBA"))
+        base.save(out_bytes, format="PSD")
     except Exception as e:
-        return jsonify({"error": f"Failed to save PSD after renaming: {str(e)}"}), 500
+        return jsonify({"error": f"Failed to save renamed PSD: {str(e)}"}), 500
 
     out_bytes.seek(0)
     return send_file(out_bytes, as_attachment=True, download_name="renamed.psd")
@@ -95,27 +88,22 @@ def debug_layers():
         file.save(tmp.name)
         psd_path = tmp.name
 
-    if not PSD_TOOLS_AVAILABLE:
-        return jsonify({"error": "psd-tools library not available on server"}), 500
-
     try:
         psd = PSDImage.open(psd_path)
     except Exception as e:
-        return jsonify({"error": f"Failed to open PSD. Likely unsupported format. Details: {str(e)}"}), 500
+        return jsonify({"error": f"Failed to open PSD with pillow-psd: {str(e)}"}), 500
 
     info = []
-    for i, l in enumerate(psd):
+    for i, layer in enumerate(psd.layers):
         try:
+            img = layer.as_PIL()
             info.append({
                 "index": i,
-                "name": l.name,
-                "kind": getattr(l, 'kind', 'unknown'),
-                "size": getattr(l, 'size', None)
+                "size": img.size,
+                "mode": img.mode,
+                "visible": layer.is_visible()
             })
         except Exception as e:
-            info.append({"index": i, "name": "Unknown", "kind": "error", "error": str(e)})
-
-    if not info:
-        return jsonify({"error": "PSD opened but no layers found"}), 500
+            info.append({"index": i, "error": str(e)})
 
     return jsonify(info)
