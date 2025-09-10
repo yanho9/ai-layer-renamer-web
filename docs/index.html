@@ -9,8 +9,16 @@
   <h1>AI Layer Renamer</h1>
   <form id="uploadForm">
     <input type="file" id="fileInput" accept=".psd" />
-    <button type="submit">Upload & Rename</button>
+    <br><br>
+    <label>
+      <input type="checkbox" id="debugToggle" />
+      Debug mode (show layer info instead of renaming)
+    </label>
+    <br><br>
+    <button type="submit">Upload</button>
   </form>
   <p id="status"></p>
+  <pre id="debugOutput" style="text-align:left; margin:auto; max-width:600px;"></pre>
 </body>
 </html>
+
