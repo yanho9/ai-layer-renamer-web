@@ -5,7 +5,10 @@ document.getElementById("uploadForm").addEventListener("submit", async (e) => {
   const statusEl = document.getElementById("status");
   const debugEl = document.getElementById("debugOutput");
 
-  if (!fileInput.files.length) return;
+  if (!fileInput.files.length) {
+    statusEl.textContent = "❌ Please select a PSD file first.";
+    return;
+  }
 
   statusEl.textContent = "Processing...";
   debugEl.textContent = "";
@@ -23,13 +26,15 @@ document.getElementById("uploadForm").addEventListener("submit", async (e) => {
       body: formData,
     });
 
-    if (!res.ok) throw new Error("Request failed");
+    if (!res.ok) throw new Error("Request failed with " + res.status);
 
     if (debugMode) {
+      // Show JSON of layer info
       const json = await res.json();
       debugEl.textContent = JSON.stringify(json, null, 2);
       statusEl.textContent = "✅ Debug info loaded!";
     } else {
+      // Download renamed PSD
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
