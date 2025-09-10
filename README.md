@@ -4,10 +4,10 @@ A minimal web app that renames Photoshop PSD layers using AI.
 
 ## Backend (Render)
 1. Go to [Render](https://render.com) → New → Web Service.
-2. Connect this repo, set **root directory** = `backend`.
+2. Connect this repo, use root directory = `/` (repo root).
 3. Build command:
    ```
-   pip install -r backend/requirements.txt
+   pip install -r requirements.txt
    ```
 4. Start command:
    ```
