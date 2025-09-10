@@ -1,6 +1,6 @@
 from flask import Flask, request, send_file, jsonify
 from psd_tools import PSDImage
-import openai, os, io
+import openai, os, io, tempfile
 
 app = Flask(__name__)
 
@@ -17,8 +17,18 @@ def rename_layers():
         return jsonify({"error": "No file uploaded"}), 400
 
     file = request.files["file"]
-    psd = PSDImage.open(file)
 
+    # Save uploaded PSD to a temporary file
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".psd") as tmp:
+        file.save(tmp.name)
+        psd_path = tmp.name
+
+    try:
+        psd = PSDImage.open(psd_path)
+    except Exception as e:
+        return jsonify({"error": f"Failed to load PSD: {str(e)}"}), 500
+
+    # Try renaming layers
     for i, layer in enumerate(psd):
         if not layer.is_group() and layer.is_visible():
             desc = f"Layer {i} | Size: {layer.size}, Visible: {layer.is_visible()}"
@@ -33,7 +43,7 @@ def rename_layers():
                 new_name = response["choices"][0]["message"]["content"].strip()
                 layer.name = new_name
             except Exception as e:
-                print("Error:", e)
+                print("Error with AI rename:", e)
 
     out_bytes = io.BytesIO()
     psd.save(out_bytes)
@@ -41,5 +51,19 @@ def rename_layers():
 
     return send_file(out_bytes, as_attachment=True, download_name="renamed.psd")
 
-if __name__ == "__main__":
-    app.run(debug=True)
+@app.route("/debug", methods=["POST"])
+def debug_layers():
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    file = request.files["file"]
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".psd") as tmp:
+        file.save(tmp.name)
+        psd_path = tmp.name
+
+    try:
+        psd = PSDImage.open(psd_path)
+        info = [{"name": l.name, "kind": getattr(l, 'kind', 'unknown')} for l in psd]
+        return jsonify(info)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
