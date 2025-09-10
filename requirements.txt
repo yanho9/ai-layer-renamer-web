@@ -1,5 +1,5 @@
 flask
-psd-tools
 pillow
+pillow-psd
 openai
 gunicorn
